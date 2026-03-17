@@ -18,7 +18,7 @@ const Billing = () => {
 
   const fetchProducts = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/products');
+      const res = await axios.get('https://billbackend-b2li.onrender.com/api/products');
       setProducts(res.data);
     } catch (err) {
       console.error(err);
@@ -73,7 +73,7 @@ const Billing = () => {
         data.append('orderImage', orderImage);
       }
 
-      await axios.post('http://localhost:5000/api/orders', data, {
+      await axios.post('https://billbackend-b2li.onrender.com/api/orders', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       

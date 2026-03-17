@@ -12,7 +12,7 @@ const ProductList = () => {
 
   const fetchProducts = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/products');
+      const res = await axios.get('https://billbackend-b2li.onrender.com/api/products');
       setProducts(res.data.map(p => ({ ...p, quantity: 1 })));
     } catch (err) {
       console.error(err);
@@ -43,9 +43,9 @@ const ProductList = () => {
       };
 
       if (isEditing) {
-        await axios.put(`http://localhost:5000/api/products/${currentProductId}`, data, config);
+        await axios.put(`https://billbackend-b2li.onrender.com/api/products/${currentProductId}`, data, config);
       } else {
-        await axios.post('http://localhost:5000/api/products', data, config);
+        await axios.post('https://billbackend-b2li.onrender.com/api/products', data, config);
       }
       resetForm();
       fetchProducts();
@@ -65,7 +65,7 @@ const ProductList = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/products/${id}`);
+        await axios.delete(`https://billbackend-b2li.onrender.com/api/products/${id}`);
         fetchProducts();
       } catch (err) {
         alert('Error deleting product');
