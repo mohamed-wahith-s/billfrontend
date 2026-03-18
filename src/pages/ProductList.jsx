@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 import { Edit2, Trash2, X } from 'lucide-react';
 
 const ProductList = () => {
@@ -7,12 +7,12 @@ const ProductList = () => {
   const [showForm, setShowForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentProductId, setCurrentProductId] = useState(null);
-  const [formData, setFormData] = useState({ name: '', price: '', image: '' });
+  const [formData, setFormData] = useState({ name: '', price: '', image: '', barcode: '' });
   const [imageFile, setImageFile] = useState(null);
 
   const fetchProducts = async () => {
     try {
-      const res = await axios.get('https://billbackend-b2li.onrender.com/api/products');
+      const res = await api.get('/products');
       setProducts(res.data.map(p => ({ ...p, quantity: 1 })));
     } catch (err) {
       console.error(err);
@@ -29,11 +29,11 @@ const ProductList = () => {
       const data = new FormData();
       data.append('name', formData.name);
       data.append('price', formData.price);
-      if (formData.image && !imageFile) {
-        data.append('image', formData.image);
-      }
+      data.append('barcode', formData.barcode);
       if (imageFile) {
         data.append('image', imageFile);
+      } else if (formData.image) {
+        data.append('image', formData.image);
       }
 
       const config = {
@@ -43,9 +43,9 @@ const ProductList = () => {
       };
 
       if (isEditing) {
-        await axios.put(`https://billbackend-b2li.onrender.com/api/products/${currentProductId}`, data, config);
+        await api.put(`/products/${currentProductId}`, data, config);
       } else {
-        await axios.post('https://billbackend-b2li.onrender.com/api/products', data, config);
+        await api.post('/products', data, config);
       }
       resetForm();
       fetchProducts();
@@ -55,7 +55,7 @@ const ProductList = () => {
   };
 
   const handleEdit = (product) => {
-    setFormData({ name: product.name, price: product.price, image: product.image || '' });
+    setFormData({ name: product.name, price: product.price, image: product.image || '', barcode: product.barcode || '' });
     setCurrentProductId(product._id);
     setIsEditing(true);
     setShowForm(true);
@@ -65,7 +65,7 @@ const ProductList = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
-        await axios.delete(`https://billbackend-b2li.onrender.com/api/products/${id}`);
+        await api.delete(`/products/${id}`);
         fetchProducts();
       } catch (err) {
         alert('Error deleting product');
@@ -74,7 +74,7 @@ const ProductList = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', price: '', image: '' });
+    setFormData({ name: '', price: '', image: '', barcode: '' });
     setImageFile(null);
     setShowForm(false);
     setIsEditing(false);
@@ -114,12 +114,16 @@ const ProductList = () => {
               <input type="number" placeholder="0.00" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} style={styles.input} required />
             </div>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Image URL</label>
+              <label style={styles.label}>Image URL (Optional)</label>
               <input type="text" placeholder="https://example.com/image.jpg" value={formData.image} onChange={(e) => setFormData({...formData, image: e.target.value})} style={styles.input} disabled={!!imageFile} />
             </div>
             <div style={styles.inputGroup}>
               <label style={styles.label}>Or Upload Local Image</label>
-              <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files[0])} style={styles.input} disabled={!!formData.image} />
+              <input type="file" onChange={(e) => setImageFile(e.target.files[0])} style={styles.input} accept="image/*" />
+            </div>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Barcode</label>
+              <input type="text" placeholder="e.g. 123456789" value={formData.barcode} onChange={(e) => setFormData({...formData, barcode: e.target.value})} style={styles.input} />
             </div>
             <button type="submit" style={isEditing ? styles.updateBtn : styles.submitBtn}>
               {isEditing ? 'Update Product' : 'Save Product'}
@@ -141,6 +145,12 @@ const ProductList = () => {
             <div style={styles.cardBody}>
               <h3 style={styles.productName}>{product.name}</h3>
               <p style={styles.price}>Rs. {product.price}</p>
+              {product.barcode && (
+                <div style={styles.barcodeBadge}>
+                  <ScanLine size={12} />
+                  <span>{product.barcode}</span>
+                </div>
+              )}
               
               <div style={styles.testQty}>
                 <div style={styles.qtyContainer}>
@@ -179,13 +189,15 @@ const styles = {
   editBtn: { backgroundColor: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '6px', padding: '8px', cursor: 'pointer', color: '#3b82f6', display: 'flex' },
   cardDelBtn: { backgroundColor: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: '6px', padding: '8px', cursor: 'pointer', color: '#ef4444', display: 'flex' },
   cardBody: { padding: '1.5rem' },
-  productName: { fontSize: '1.125rem', fontWeight: '700', marginBottom: '0.5rem' },
-  price: { color: '#10b981', fontWeight: '800', fontSize: '1.25rem', marginBottom: '1rem' },
+  productName: { fontSize: '1.125rem', fontWeight: '700', marginBottom: '0.25rem' },
+  price: { color: '#10b981', fontWeight: '800', fontSize: '1.25rem', marginBottom: '0.5rem' },
+  barcode: { fontSize: '0.8rem', color: '#64748b', marginBottom: '1rem' },
   testQty: { borderTop: '1px solid #f1f5f9', paddingTop: '1rem' },
   qtyContainer: { display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' },
   qtyBtn: { width: '28px', height: '28px', borderRadius: '50%', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer' },
   qtyText: { fontWeight: '600' },
-  total: { fontSize: '0.875rem', color: '#64748b', fontWeight: '500' }
+  total: { fontSize: '0.875rem', color: '#64748b', fontWeight: '500' },
+  barcodeBadge: { display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', color: '#475569', fontWeight: '600', marginBottom: '1rem' }
 };
 
 export default ProductList;

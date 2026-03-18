@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Plus, Minus, Trash2, ReceiptText } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import api from '../api';
+import { Plus, Minus, Trash2, ReceiptText, ScanLine, X } from 'lucide-react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 const Billing = () => {
   const [products, setProducts] = useState([]);
@@ -11,14 +12,54 @@ const Billing = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [tempQty, setTempQty] = useState('1');
+  const [showScanner, setShowScanner] = useState(false);
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const barcodeRef = useRef(null);
 
   useEffect(() => {
     fetchProducts();
   }, []);
 
+  useEffect(() => {
+    let scanner = null;
+    if (showScanner) {
+      scanner = new Html5QrcodeScanner('reader', {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+      });
+
+      scanner.render(onScanSuccess, onScanError);
+    }
+
+    return () => {
+      if (scanner) {
+        scanner.clear().catch(error => console.error("Failed to clear scanner", error));
+      }
+    };
+  }, [showScanner, products]);
+
+  const onScanSuccess = (decodedText) => {
+    handleBarcodeSearch(decodedText);
+    setShowScanner(false);
+  };
+
+  const handleBarcodeSearch = (code) => {
+    const product = products.find(p => p.barcode === code);
+    if (product) {
+      addToCart(product, 1);
+      setBarcodeInput('');
+    } else {
+      alert(`Product with barcode ${code} not found`);
+    }
+  };
+
+  const onScanError = (err) => {
+    // console.warn(err);
+  };
+
   const fetchProducts = async () => {
     try {
-      const res = await axios.get('https://billbackend-b2li.onrender.com/api/products');
+      const res = await api.get('/products');
       setProducts(res.data);
     } catch (err) {
       console.error(err);
@@ -73,7 +114,7 @@ const Billing = () => {
         data.append('orderImage', orderImage);
       }
 
-      await axios.post('https://billbackend-b2li.onrender.com/api/orders', data, {
+      await api.post('/orders', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
@@ -134,15 +175,45 @@ const Billing = () => {
         {/* Product Selection */}
         <div style={styles.section}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>Select Products</h2>
-            <input 
-              type="text" 
-              placeholder="Search products..." 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <h2 style={styles.sectionTitle}>Select Products</h2>
+              <button
+                onClick={() => setShowScanner(!showScanner)}
+                style={showScanner ? styles.scannerBtnActive : styles.scannerBtn}
+              >
+                <ScanLine size={18} style={{ marginRight: '0.5rem' }} />
+                {showScanner ? 'Close Scanner' : 'Scan Barcode'}
+              </button>
+            </div>
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               style={styles.searchBar}
             />
           </div>
+
+          <div style={styles.barcodeSection}>
+            <ScanLine size={20} color="#64748b" />
+            <input
+              ref={barcodeRef}
+              type="text"
+              placeholder="Scan or Enter Barcode"
+              value={barcodeInput}
+              onChange={(e) => setBarcodeInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleBarcodeSearch(barcodeInput)}
+              style={styles.barcodeInput}
+            />
+          </div>
+
+          {showScanner && (
+            <div style={styles.scannerWrapper}>
+              <div id="reader"></div>
+              <p style={styles.scannerHint}>Align product barcode within the frame</p>
+            </div>
+          )}
+
           <div style={styles.grid}>
             {filteredProducts.map(p => (
               <div key={p._id} style={styles.pCard} onClick={() => setSelectedProduct(p)}>
@@ -160,12 +231,12 @@ const Billing = () => {
         {selectedProduct && (
           <div style={styles.modalOverlay}>
             <div style={styles.qtyModal}>
-              <h3 style={{marginBottom: '1rem'}}>Add {selectedProduct.name}</h3>
-              <p style={{fontSize: '0.9rem', color: '#64748b', marginBottom: '1.5rem'}}>Enter weight or quantity</p>
-              
-              <input 
-                type="number" 
-                value={tempQty} 
+              <h3 style={{ marginBottom: '1rem' }}>Add {selectedProduct.name}</h3>
+              <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '1.5rem' }}>Enter weight or quantity</p>
+
+              <input
+                type="number"
+                value={tempQty}
                 onChange={(e) => setTempQty(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addToCart(selectedProduct)}
                 style={styles.modalInput}
@@ -202,17 +273,17 @@ const Billing = () => {
                       <div style={styles.itemPrice}>Rs. {item.price} x {item.quantity}</div>
                     </div>
                     <div style={styles.itemActions}>
-                      <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end'}}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                         <div style={styles.qtyControls}>
-                          <button onClick={() => updateCartQty(item._id, -0.1)} style={styles.qtySmallBtn}><Minus size={14}/></button>
-                          <input 
-                            type="number" 
+                          <button onClick={() => updateCartQty(item._id, -0.1)} style={styles.qtySmallBtn}><Minus size={14} /></button>
+                          <input
+                            type="number"
                             step="0.01"
-                            value={item.quantity} 
+                            value={item.quantity}
                             onChange={(e) => updateCartQty(item._id, e.target.value, false)}
                             style={styles.qtyInput}
                           />
-                          <button onClick={() => updateCartQty(item._id, 0.1)} style={styles.qtySmallBtn}><Plus size={14}/></button>
+                          <button onClick={() => updateCartQty(item._id, 0.1)} style={styles.qtySmallBtn}><Plus size={14} /></button>
                         </div>
                         <div style={styles.quickQtyContainer}>
                           <button onClick={() => updateCartQty(item._id, 0.25, false)} style={styles.quickQtyBtn}>250g</button>
@@ -221,7 +292,7 @@ const Billing = () => {
                           <button onClick={() => updateCartQty(item._id, 1, false)} style={styles.quickQtyBtn}>1kg</button>
                         </div>
                       </div>
-                      <button onClick={() => removeFromCart(item._id)} style={styles.delBtn}><Trash2 size={16} color="#ef4444"/></button>
+                      <button onClick={() => removeFromCart(item._id)} style={styles.delBtn}><Trash2 size={16} color="#ef4444" /></button>
                     </div>
                   </div>
                 ))}
@@ -231,18 +302,18 @@ const Billing = () => {
                   <span>Total Amount</span>
                   <span style={styles.totalValue}>Rs. {calculateTotal()}</span>
                 </div>
-                
-                <div style={{marginBottom: '1rem'}}>
-                  <label style={{fontSize: '0.875rem', fontWeight: '600', display: 'block', marginBottom: '0.5rem'}}>Upload Bill Image (Optional)</label>
-                  <input 
-                    type="file" 
-                    onChange={(e) => setOrderImage(e.target.files[0])} 
-                    style={{width: '100%', fontSize: '0.8rem'}}
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '600', display: 'block', marginBottom: '0.5rem' }}>Upload Bill Image (Optional)</label>
+                  <input
+                    type="file"
+                    onChange={(e) => setOrderImage(e.target.files[0])}
+                    style={{ width: '100%', fontSize: '0.8rem' }}
                   />
                 </div>
 
                 <button onClick={handleSaveOrder} style={styles.generateBtn}>
-                  <ReceiptText size={20} style={{marginRight: '0.5rem'}}/>
+                  <ReceiptText size={20} style={{ marginRight: '0.5rem' }} />
                   Save & Generate Bill
                 </button>
               </div>
@@ -298,7 +369,13 @@ const styles = {
   modalQtyBtn: { padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.9rem' },
   modalActions: { display: 'flex', gap: '1rem' },
   cancelBtn: { flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', background: '#f1f5f9', color: '#64748b', cursor: 'pointer', fontWeight: '600' },
-  confirmBtn: { flex: 2, padding: '0.75rem', borderRadius: '8px', border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: '700' }
+  confirmBtn: { flex: 2, padding: '0.75rem', borderRadius: '8px', border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: '700' },
+  scannerBtn: { display: 'flex', alignItems: 'center', padding: '0.5rem 1rem', backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#475569' },
+  scannerBtnActive: { display: 'flex', alignItems: 'center', padding: '0.5rem 1rem', backgroundColor: '#fee2e2', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#dc2626' },
+  scannerWrapper: { marginBottom: '2rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '12px', border: '2px dashed #e2e8f0' },
+  scannerHint: { textAlign: 'center', marginTop: '1rem', fontSize: '0.875rem', color: '#64748b' },
+  barcodeSection: { display: 'flex', alignItems: 'center', gap: '0.75rem', backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '1.5rem' },
+  barcodeInput: { flex: 1, border: 'none', background: 'transparent', fontSize: '1rem', outline: 'none', color: '#1e293b', fontWeight: '500' }
 };
 
 export default Billing;
