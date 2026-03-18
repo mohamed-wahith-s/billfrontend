@@ -14,6 +14,7 @@ const Billing = () => {
   const [tempQty, setTempQty] = useState('1');
   const [showScanner, setShowScanner] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
   const barcodeRef = useRef(null);
 
   useEffect(() => {
@@ -104,6 +105,29 @@ const Billing = () => {
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [searchTerm]);
+
+  const handleKeyDown = (e) => {
+    if (filteredProducts.length === 0) return;
+
+    if (e.key === 'ArrowRight') {
+      setActiveIndex((prev) => (prev + 1) % filteredProducts.length);
+    } else if (e.key === 'ArrowLeft') {
+      setActiveIndex((prev) => (prev - 1 + filteredProducts.length) % filteredProducts.length);
+    } else if (e.key === 'ArrowDown') {
+      // Approximate 4 columns for grid navigation
+      setActiveIndex((prev) => (prev + 4) % filteredProducts.length);
+    } else if (e.key === 'ArrowUp') {
+      setActiveIndex((prev) => (prev - 4 + filteredProducts.length) % filteredProducts.length);
+    } else if (e.key === 'Enter') {
+      if (filteredProducts[activeIndex]) {
+        setSelectedProduct(filteredProducts[activeIndex]);
+      }
+    }
+  };
+
   const handleSaveOrder = async () => {
     try {
       const data = new FormData();
@@ -190,6 +214,7 @@ const Billing = () => {
               placeholder="Search products..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={handleKeyDown}
               style={styles.searchBar}
             />
           </div>
@@ -215,8 +240,12 @@ const Billing = () => {
           )}
 
           <div style={styles.grid}>
-            {filteredProducts.map(p => (
-              <div key={p._id} style={styles.pCard} onClick={() => setSelectedProduct(p)}>
+            {filteredProducts.map((p, index) => (
+              <div 
+                key={p._id} 
+                style={index === activeIndex ? styles.pCardActive : styles.pCard} 
+                onClick={() => setSelectedProduct(p)}
+              >
                 <img src={p.image || 'https://via.placeholder.com/150'} alt={p.name} style={styles.pImage} />
                 <div style={styles.pInfo}>
                   <h4>{p.name}</h4>
@@ -333,7 +362,8 @@ const styles = {
   sectionTitle: { fontSize: '1.5rem', color: '#1e293b' },
   searchBar: { padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0', width: '300px', outline: 'none', fontSize: '0.9rem' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' },
-  pCard: { border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.1s' },
+  pCard: { border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s' },
+  pCardActive: { border: '2px solid #2563eb', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s', transform: 'scale(1.02)', boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.2)' },
   pImage: { width: '100%', height: '120px', objectFit: 'cover' },
   pInfo: { padding: '0.75rem', textAlign: 'center' },
   sidebar: { backgroundColor: '#fff', padding: '1.5rem', borderRadius: '12px', height: 'fit-content', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', position: 'sticky', top: '2rem' },
